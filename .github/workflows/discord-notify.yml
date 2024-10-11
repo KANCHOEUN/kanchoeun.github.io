@@ -1,0 +1,19 @@
+name: Discord Notification on Commit
+
+on:
+  push:
+    branches:
+      - main  # 원하는 브랜치로 설정
+
+jobs:
+  notify-discord:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Send notification to Discord
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        curl -H "Content-Type: application/json" \
+             -d '{"content": "New commit pushed to the repository!"}' \
+             $DISCORD_WEBHOOK_URL
