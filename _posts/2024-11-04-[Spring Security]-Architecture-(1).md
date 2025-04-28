@@ -4,13 +4,13 @@ description: Servlet 기반 애플리케이션에서 Spring Security의 전반�
 author: kancho
 date: 2024-11-01 17:25:00 +1500
 categories: [Frameworks, Spring Security]
-tags: [SpringSecurity]
+tags: [Spring Security]
 pin: false
 # math: true
 # mermaid: true
 ---
 
-해당 페이지에서는 Servlet 기반 애플리케이션에서 스프링 시큐리티 아키텍처의 전반적인 개념들에 대해 설명한다.
+해당 페이지는 스프링 시큐리티의 공식 문서를 기반으로 작성하였습니다.
 
 
 ## Filter란
