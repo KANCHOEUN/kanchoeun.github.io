@@ -5,7 +5,7 @@ author: kancho
 date: 2024-10-17 11:56:00 +0500
 categories: [Programming Languages, Java]
 tags: [Java]
-pin: true
+pin: false
 # math: true
 # mermaid: true
 ---
