@@ -1,5 +1,5 @@
 ---
-title: Filter와 Interceptor에서 ResponseBody를 수정할 수 있을까
+title: Filter와 Interceptor에서 Response의 body를 수정할 수 있을까
 description: Spring MVC Request Lifecycle에서 HttpMessageConverter 톺아보기
 author: kancho
 date: 2025-05-13 22:06:00
@@ -115,15 +115,15 @@ Converter에서 HTTP 응답 헤더를 설정한 후, `writeInternal()` 을 통�
 
 <img src="../assets/img/posts/servletresponse-flushBuffer.png" />
 
-이 메서드는 ~={orange}**버퍼에 있는 모든 내용을 클라이언트에게 강제로 전송**=~한다. 이 시점에 서블릿 응답은 자동으로 ~={orange}**commit**=~이 되는데, 이는 **상태 코드와 헤더가 전송되었다**는 뜻이다. 
+이 메서드는 <span style='color:#20bf6b'>**버퍼에 있는 모든 내용을 클라이언트에게 강제로 전송**</span>한다. 이 시점에 서블릿 응답은 자동으로 <span style='color:#f7b731'>**commit**</span>이 되는데, 이는 <span style='color:#20bf6b'>**상태 코드와 헤더가 전송되었다**</span>는 뜻이다. 
 
 그리고 여기서 중요한 점은 `@ResponseBody` 나 `ResponseEntity` 를 사용하는 경우, 위에서 설명한 `MessageConverter.write()` 단계에서
-1. body를 직렬화된 데이터로 출력 스트림에 작성한 후
-2. `flush()` 를 호출하기 때문에
+1. **body를 직렬화된 데이터로 출력 스트림에 작성**한 후
+2. **`flush()` 를 호출**하기 때문에
 
-body는 상태 코드, 헤더와 함께 클라이언트로 전송된다는 점이다.
+**Response의 body 또한** 상태 코드, 헤더와 함께 **클라이언트로 전송된다**는 점이다.
 
-이미 전송된 Response를 건드릴 방법은 없기 때문에, 그 이후 시점인 Interceptor의 `postHandle()` 이나 Filter의 `doFilter()` 에서는 Response의 body를 더 이상 수정할 수 없다.
+이미 전송된 Response를 건드릴 방법은 없기 때문에, **그 이후 시점인** **Interceptor의 `postHandle()`** 이나 **Filter의 `doFilter()` 에서는** Response의 **body를 더 이상 수정할 수 없다**.
 
 <br/>
 
@@ -137,7 +137,7 @@ body는 상태 코드, 헤더와 함께 클라이언트로 전송된다는 점�
 - 이 과정에서 `flush()` 가 호출되어 응답이 `committed` 상태로 변경되면서, 상태 코드와 헤더, body 직렬화 결과가 모두 네트워크를 통해 클라이언트에게 전송된다.
 - 따라서 그 이후의 시점인 Interceptor의 `postHandle()` 이나 Filter의 `doFilter()` 등에서는 응답을 수정할 수 없다.
 
-만약 `@ResponseBody`, `ResponseEntity` 를 사용할 때 응답을 조작하고 싶다면, Spring에서 제공해주는 `@ResponseBodyAdvice` 를 활용하여 직렬화 직전에 개입하는 방식으로 구현할 수 있다.
+만약 `@ResponseBody`, `ResponseEntity` 를 사용할 때 응답을 조작하고 싶다면, Spring에서 제공해주는 **`@ResponseBodyAdvice` 를 활용**하여 **직렬화 직전에 개입**하는 방식으로 구현할 수 있다.
 
 <br/>
 
