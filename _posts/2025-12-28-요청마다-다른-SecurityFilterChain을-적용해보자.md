@@ -4,8 +4,8 @@ description: Spring Security의 Multiple SecurityFilterChain 적용 중 JWT 인�
 author: kancho
 date: 2025-12-28 20:11:00
 categories: [Frameworks, Spring Security]
-tags: [Filter]
-pin: false
+tags: [Servlet, Filter]
+pin: true
 # math: true
 # mermaid: true
 ---
