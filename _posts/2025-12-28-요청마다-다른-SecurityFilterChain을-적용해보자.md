@@ -13,7 +13,15 @@ pin: false
 
 
 ## 개요
-현재 진행중인 사이드 프로젝트에서는 Spring Security 기반의 인증 시스템을 구축하였고, 서버에서 발급한 access token을 검증하기 위해 `JwtAuthenticationFilter` 를 직접 구현하여 사용하고 있다. 대부분의 요청은 인증이 필요하기 때문에 JWT 인증 필터를 거쳐야 하지만, 일부 요청은 access token의 상태와 관계 없이 처리되어야 한다.
+
+현재 진행중인 Mockly 프로젝트에서는 Spring Security 기반의 인증 시스템을 구축하였다.
+
+> Spring Security는 Servlet Filter를 기반으로 동작한다.<br/>
+> 사용자의 요청이 Controller에 도달하기 전에 여러 Filter들을 거치며 인증과 인가를 처리하는 구조다.
+{: .prompt-info }
+
+Mockly에서는 서버에서 발급한 access token을 검증하기 위해 `JwtAuthenticationFilter` 를 직접 구현하여 사용하고 있다.
+대부분의 요청은 인증이 필요하기 때문에 JWT 인증 필터를 거쳐야 하지만, 일부 요청은 access token의 상태와 관계 없이 처리되어야 한다.
 
 대표적으로 다음과 같은 요청들이 있다.
 
@@ -38,15 +46,19 @@ if (request.getRequestURI().equals("/refresh")) {
 
 간단하지만 명확한 단점이 있다.
 
-새로운 예외 URL이 추가될 때마다, Security 설정을 수정하고, Filter 내부 로직을 수정해야 한다는 것이다. 해당 요청이 인증이 필요한가라는 판단이 Security 설정에 있지 않고 Filter 내부에 숨어버리므로, 확장성과 가독성 측면에서 좋은 설계라고 보기 어려웠다.
+1. 새로운 예외 URL이 추가될 때마다 다음 코드들을 모두 수정해야 한다.
+   1. Security 설정의 `permitAll()` 목록
+   2. `JwtAuthenticationFilter` 내부의 분기 로직
+2. 해당 요청이 인증이 필요한지에 대한 판단이 Security 설정에 있지 않고 Filter 내부에 숨어버리므로, 확장성과 가독성 측면에서 좋은 설계라고 보기 어려웠다.
 
 URL에 따른 인증 정책은 Security 설정에서 결정하고, Filter는 그 결정에 따라 실행되도록 할 수 없을까?
 
-이 때 필요한 것이 Spring Security에서 제공하는 Multiple SecurityFilterChain이다.
+이 때 필요한 것이 Spring Security에서 제공하는 **`Multiple SecurityFilterChain`** 이다.
 
 <br/>
 
 ## 요청마다 다른 SecurityFilterChain을 적용해보자
+
 Spring Security는 하나의 애플리케이션 안에서 여러 개의 `SecurityFilterChain` 을 정의할 수 있도록 지원해준다.
 요청 URL이나 조건에 따라 서로 다른 Filter Chain을 적용할 수 있는 구조다.
 
@@ -63,31 +75,36 @@ public class SecurityConfig {
     // ...
   
     @Bean  
-    @Order(1)  
+    @Order(1) // 가장 먼저 검사되는 SecurityFilterChain
     public SecurityFilterChain publicSecurityFilterChain(HttpSecurity http) throws Exception {  
         http  
-                .securityMatcher( 
+                // 해당 SecurityFilterChain이 적용될 URL 패턴들
+                .securityMatcher(
                         "/api/auth/refresh",  
                         "/api/auth/logout",
                         // (중략)
                 )  
                 .csrf(AbstractHttpConfigurer::disable)  
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))  
+                // 해당 체인에 들어온 요청은 인증 없이 접근 허용
                 .authorizeHttpRequests(auth -> auth.anyRequest().permitAll())  
                 .headers(headers -> headers  
                         .frameOptions(HeadersConfigurer.FrameOptionsConfig::disable));  
   
         return http.build();  
     }  
-    @Bean  
-    @Order(2)  
+
+    @Bean
+    @Order(2) // publicSecurityFilterChain에 해당되지 않은 나머지 요청에 적용
     public SecurityFilterChain privateSecurityFilterChain(HttpSecurity http) throws Exception {  
         http  
                 .csrf(AbstractHttpConfigurer::disable)  
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))  
+                // 해당 체인에 들어온 요청은 인증된 사용자만 접근 가능
                 .authorizeHttpRequests(auth -> auth.anyRequest().authenticated())  
                 .exceptionHandling(exception -> exception  
                         .authenticationEntryPoint(customAuthenticationEntryPoint))  
+                // JWT 인증 필터 등록
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);  
   
         return http.build();  
@@ -107,6 +124,8 @@ public class SecurityConfig {
 ### Servlet Container가 관리하는 FilterChain과 Spring Container가 관리하는 SecurityFilterChain
 Spring Security에서는 이름은 비슷하지만 다른 역할을 가진 두 가지 FilterChain이 존재한다.
 
+<img src="../assets/img/posts/spring-security-chain-architecture-1.png" />
+
 #### FilterChain
 `FilterChain` 은 Tomcat과 같은 Embedded <u>Servlet Container가 관리</u>하는 FilterChain으로 `javax.servlet.Filter` 을 기반으로 동작한다.
 
@@ -120,18 +139,20 @@ Spring Security는 인증 방식, 인가 정책, 예외 처리 전략 등을 Bea
 즉 SecurityFilterChain은 어떤 요청에 어떤 보안 Filter들을 적용할 것인가를 정의한 보안 규칙의 집합이라 볼 수 있다.
 
 
-#### DelegatingFilterProxy와 FilterChainProxy
+#### 두 구조를 연결하는 `DelegatingFilterProxy` 와 `FilterChainProxy`
 Spring Security는 인증과 인가 같은 보안 로직이 Spring MVC의 DispatcherServlet에 도달하기 이전에 수행되기를 원한다. 이를 위해 Servlet Spec에서 제공하는 Filter 레벨에서 동작해야 한다.
 
 하지만 Servlet Container는 Spring Bean들을 직접 관리할 수 없다. 인증을 수행하는 `AuthenticationManager`, 사용자 정보를 조회하는 `UserDetailsService` 와 같은 핵심 보안 컴포넌트들은 모두 Spring Container에서 관리되는 Bean이기 때문이다.
 
 이 두 개의 독립적인 Container를 연결하기 위해 등장한 것이 **`DelegatingFilterProxy`** 다.
 
-`DelegatingFilterProxy` 는 Servlet Container의 FilterChain에 Servlet Filter로 등록된다. 그리고 **실제 보안 처리는** Spring Container 안에 있는 **Spring Security로 위임**하는데, 이 때 위임 대상이 되는 Bean이 바로 `FilterChainProxy` 다. 
+<img src="../assets/img/posts/spring-security-chain-architecture-2.png" />
 
-`FilterChainProxy` 는 여러 개의 `SecurityFilterChain` 을 관리한다. 요청이 들어오면 URL이나 Matcher 조건을 기준으로 어떤 SecurityFilterChain을 적용할지 결정하고, 그에 해당하는 보안 Filter들을 실행한다.
+`DelegatingFilterProxy` 는 Servlet Container의 FilterChain에 Servlet Filter로 등록된다. 이 Filter는 실제 **보안 처리를 직접 수행하지 않고**, Spring Container에 있는 **Spring Security로** 처리를 **위임**한다. 이 때 요청을 위임받는 Bean이 바로 바로 `FilterChainProxy` 다. 
 
-내가 설정한 Multiple SecurityFilterChain 역시 바로 이 `FilterChainProxy` 안에서 요청을 URL 별로 분기하고 있는 구조다.
+`FilterChainProxy` 는 여러 개의 `SecurityFilterChain` 을 관리한다. 요청이 들어오면 URL이나 Matcher 조건을 기준으로 **어떤 SecurityFilterChain을 적용할지 결정**하고, 그에 해당하는 보안 Filter들을 실행한다.
+
+내가 앞에서 설정한 Multiple SecurityFilterChain이 바로. 이 FilterChainProxy가 요청 URL에 따라 선택하는 SecurityFilterChain들이다.
 
 ### ⚠️ Filter는 이미 Servlet Container에 등록되어 있다
 
