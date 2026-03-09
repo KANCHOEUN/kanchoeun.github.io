@@ -46,7 +46,7 @@ social:
 
 # Site Verification Settings
 webmaster_verifications:
-  google: # fill in your Google verification code
+  google: OXmcBODJ4RD2IydEfk8VA8YNcb1j1auWFKEX7-kX2v0
   bing: # fill in your Bing verification code
   alexa: # fill in your Alexa verification code
   yandex: # fill in your Yandex verification code
@@ -63,8 +63,8 @@ analytics:
   goatcounter:
     id: # fill in your GoatCounter ID
   umami:
-    id: # fill in your Umami ID
-    domain: # fill in your Umami domain
+    id: 3066e5f0-d89c-40b3-b293-501033192477
+    domain: "cloud.umami.is"
   matomo:
     id: # fill in your Matomo ID
     domain: # fill in your Matomo domain
